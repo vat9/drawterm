@@ -1034,19 +1034,27 @@ initimg(void)
 	NSSize devSize = [[description objectForKey:NSDeviceSize] sizeValue];
 	CGSize scrSize = CGDisplayScreenSize(
             [[description objectForKey:@"NSScreenNumber"] unsignedIntValue]);
-	CGFloat dpi = ((devSize.width / scrSize.width) * 25.4f);
-	CGFloat scale;
-    
-	NSSize size, scaledSize;
+	CGFloat ppi = devSize.width / (scrSize.width / 25.4f);  // scrSize is mm
+	NSSize bounds, size, scaledSize;
 	MTLTextureDescriptor *textureDesc;
 
 	LOGG("devSize(%g,%g) screenSize(%g,%g)\n", devSize.width, devSize.height, scrSize.width, scrSize.height);
 
-	displaydpi = [[win.deviceDescription valueForKey:NSDeviceResolution] sizeValue].width;
+	bounds = [myContent bounds].size;
 
-  	scaleimg = displaydpi / dpi * 1.333f;	// was [as a decent compromise] 96.0f;
-	size = [myContent convertSizeToBacking:[myContent bounds].size];
+	if([win backingScaleFactor] == 1.0) {
+		displaydpi = 72;
+		scaleimg = 96.0f / 72.0f;
+		size = [myContent bounds].size;
+	} else {
+		displaydpi = ppi;
+		scaleimg = ppi / 72.0f;
+		size = [myContent convertSizeToBacking:[myContent bounds].size];
+	}
 	scaledSize = NSMakeSize(round(size.width / scaleimg), round(size.height / scaleimg));
+	LOGG("sizes: bounds(%g, %g) size(%g, %g), scaledSize(%g, %g)\n",
+		bounds.width, bounds.height, size.width, size.height, scaledSize.width, scaledSize.height);
+
 	LOGM("mouserect: size(%.0f, %.0f) -> scaled(%.1f, %.1f)\n", size.width, size.height, scaledSize.width, scaledSize.height);
 	mouserect = Rect(0, 0, scaledSize.width, scaledSize.height);
 
@@ -1067,12 +1075,11 @@ initimg(void)
 	textureDesc.cpuCacheMode = MTLCPUCacheModeWriteCombined;
 	texture = [device newTextureWithDescriptor:textureDesc];
 
-	scale = [win backingScaleFactor];
-	LOGG("backingScaleFactor: %g -> %g\n", scale, scaleimg);
 	[layer setDrawableSize:scaledSize];
 	[layer setContentsScale:scaleimg];
 
-	LOGG("display: (dpi %d) (ppi %f)\n", displaydpi, dpi);
+	LOGG("backingScaleFactor: %g -> %g\n", [win.screen backingScaleFactor], scaleimg);
+	LOGG("display: (ppi %f)\n", ppi);
 }
 	LOG(@"initimg return");
 
